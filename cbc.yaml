@@ -1,0 +1,56 @@
+author: Paul Kalhorn
+description: Compute Block that offers Topic Modeling Algorihtms
+docker_image: <tbs>
+entrypoints:
+  lda_topic_modeling:
+    description: Sklearn LDA Topic Modeling 
+    envs:
+      LEARNING_METHOD: batch
+      MAX_ITER: 10
+      N_TOPICS: 5
+      N_TOP_WORDS: 10
+    inputs:
+      dtm:
+        config:
+          dtm_BUCKET_NAME: null
+          dtm_FILE_EXT: pkl
+          dtm_FILE_NAME: null
+          dtm_FILE_PATH: null
+          dtm_S3_ACCESS_KEY: null
+          dtm_S3_HOST: null
+          dtm_S3_PORT: null
+          dtm_S3_SECRET_KEY: null
+        description: Pkl file of your numpy representation of the document-term matrix
+        type: file
+      vocab:
+        config:
+          vocab_BUCKET_NAME: null
+          vocab_FILE_EXT: pkl
+          vocab_FILE_NAME: null
+          vocab_FILE_PATH: null
+          vocab_S3_ACCESS_KEY: null
+          vocab_S3_HOST: null
+          vocab_S3_PORT: null
+          vocab_S3_SECRET_KEY: null
+        description: Pkl file of a dictionary that maps all words to their index in the DTM
+        type: file
+    outputs:
+      doc_topic:
+        config:
+          docs_to_topics_DB_TABLE: null
+          docs_to_topics_PG_HOST: null
+          docs_to_topics_PG_PASS: null
+          docs_to_topics_PG_PORT: null
+          docs_to_topics_PG_USER: null
+        description: A table that maps documents to their topic-likelihoods
+        type: pg_table
+      topic_term:
+        config:
+          top_terms_per_topic_DB_TABLE: null
+          top_terms_per_topic_PG_HOST: null
+          top_terms_per_topic_PG_PASS: null
+          top_terms_per_topic_PG_PORT: null
+          top_terms_per_topic_PG_USER: null
+        description: A table that lists most likely terms for a topic
+        type: pg_table
+name: Topic-Modeling
