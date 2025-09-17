@@ -1,6 +1,6 @@
 author: Paul Kalhorn
 description: Compute Block that offers Topic Modeling Algorihtms
-docker_image: <tbs>
+docker_image: ghcr.io/rwth-time/topic-modeling/topic-modeling
 entrypoints:
   lda_topic_modeling:
     description: Sklearn LDA Topic Modeling 
