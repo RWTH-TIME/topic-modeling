@@ -50,7 +50,7 @@ class LDATopicModeling(EnvSettings):
 def write_df_to_postgres(df, settings: PostgresSettings):
     engine = create_engine(
             f"postgresql+psycopg2://{settings.PG_USER}:{settings.PG_PASS}"
-            f"@{settings.PG_HOST}:{settings.PG_PORT}/"
+            f"@{settings.PG_HOST}:{int(settings.PG_PORT)}/"
     )
     df.to_sql(settings.DB_TABLE, engine, if_exists="replace", index=False)
 
