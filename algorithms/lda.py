@@ -1,7 +1,11 @@
+import logging
+
 import numpy as np
 import pandas as pd
 
 from sklearn.decomposition import LatentDirichletAllocation
+
+logger = logging.getLogger(__name__)
 
 
 class LDAModeler:
@@ -24,6 +28,11 @@ class LDAModeler:
         self.random_state = random_state
         self.n_top_words = n_top_words
 
+        logger.debug(
+            f"Initialized LDAModeler: topics={n_topics}, iter={max_iter}, "
+            f"learning='{learning_method}', n_top_words={n_top_words}"
+        )
+
         self.lda = LatentDirichletAllocation(
             n_components=n_topics,
             max_iter=max_iter,
@@ -34,22 +43,31 @@ class LDAModeler:
         self.doc_topic_dist = None
 
     def fit(self):
+        logger.info(f"Running LDA fit(), DTM shape {self.dtm.shape}")
         self.lda.fit(self.dtm)
+        logger.info("LDA model fitted successfully")
 
     def extract_doc_topics(self) -> pd.DataFrame:
         """
         Generates document-topic distribution DF
         """
+        logger.info("Extracting doc-topics...")
         self.doc_topic_dist = self.lda.transform(self.dtm)
-        return pd.DataFrame(
+
+        df = pd.DataFrame(
             self.doc_topic_dist,
             columns=[f"topic_{i}" for i in range(self.n_topics)],
         )
+
+        logger.debug(
+            f"Extracted doc-topic distribution DataFrame shape={df.shape}")
+        return df
 
     def extract_topic_terms(self):
         """
         Generate topic and top-terms DataFrame
         """
+        logger.info("Extracting top terms per topic...")
         idx2term = {idx: term for term, idx in self.vocab.items()}
         topic_rows = []
 
@@ -62,4 +80,7 @@ class LDAModeler:
                     "term": idx2term[i],
                     "weight": topic[i]
                 })
-        return pd.DataFrame(topic_rows)
+
+        df = pd.DataFrame(topic_rows)
+        logger.info(f"Generated topic_terms DataFrame rows={df.shape[0]}")
+        return df
