@@ -1,3 +1,4 @@
+import logging
 import pickle
 
 from scystream.sdk.core import entrypoint
@@ -12,6 +13,12 @@ from scystream.sdk.file_handling.s3_manager import S3Operations
 from sqlalchemy import create_engine
 
 from algorithms.lda import LDAModeler
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 class DTMFileInput(FileSettings, InputSettings):
@@ -48,22 +55,37 @@ class LDATopicModeling(EnvSettings):
 
 
 def write_df_to_postgres(df, settings: PostgresSettings):
+    logger.info(f"Writing DataFrame to DB table '{settings.DB_TABLE}'…")
+
     engine = create_engine(
-            f"postgresql+psycopg2://{settings.PG_USER}:{settings.PG_PASS}"
-            f"@{settings.PG_HOST}:{int(settings.PG_PORT)}/"
+        f"postgresql+psycopg2://{settings.PG_USER}:{settings.PG_PASS}"
+        f"@{settings.PG_HOST}:{int(settings.PG_PORT)}/"
     )
     df.to_sql(settings.DB_TABLE, engine, if_exists="replace", index=False)
+    logger.info(f"Successfully wrote {len(df)} rows to '{settings.DB_TABLE}'.")
 
 
 @entrypoint(LDATopicModeling)
 def lda_topic_modeling(settings):
+    logger.info("Starting LDA topic modeling pipeline…")
+
+    logger.info("Downloading vocabulary file...")
     S3Operations.download(settings.vocab, "vocab.pkl")
+
+    logger.info("Loading vocab.pkl from disk...")
     with open("vocab.pkl", "rb") as f:
         vocab = pickle.load(f)
 
+    logger.info(f"Loaded vocab with {len(vocab)} terms.")
+
+    logger.info("Downloading DTM file...")
     S3Operations.download(settings.dtm, "dtm.pkl")
+
+    logger.info("Loading dtm.pkl from disk...")
     with open("dtm.pkl", "rb") as f:
         dtm = pickle.load(f)
+
+    logger.info(f"Loaded DTM with shape {dtm.shape}")
 
     # TODO: Check if dtm and vocab is of correct schema
     lda = LDAModeler(
