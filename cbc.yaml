@@ -9,6 +9,8 @@ entrypoints:
       MAX_ITER: 10
       N_TOPICS: 5
       N_TOP_WORDS: 10
+      DTM_DOWNLOAD_PATH: /tmp/dtm.pkl
+      VOCAB_DOWNLOAD_PATH: /tmp/vocab.pkl
     inputs:
       dtm:
         config:
