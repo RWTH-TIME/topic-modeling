@@ -47,6 +47,9 @@ class LDATopicModeling(EnvSettings):
     LEARNING_METHOD: str = "batch"
     N_TOP_WORDS: int = 10
 
+    DTM_DOWNLOAD_PATH: str = "/tmp/dtm.pkl"
+    VOCAB_DOWNLOAD_PATH: str = "/tmp/vocab.pkl"
+
     vocab: VocabFileInput
     dtm: DTMFileInput
 
@@ -70,19 +73,19 @@ def lda_topic_modeling(settings):
     logger.info("Starting LDA topic modeling pipeline…")
 
     logger.info("Downloading vocabulary file...")
-    S3Operations.download(settings.vocab, "vocab.pkl")
+    S3Operations.download(settings.vocab, settings.VOCAB_DOWNLOAD_PATH)
 
     logger.info("Loading vocab.pkl from disk...")
-    with open("vocab.pkl", "rb") as f:
+    with open(settings.VOCAB_DOWNLOAD_PATH, "rb") as f:
         vocab = pickle.load(f)
 
     logger.info(f"Loaded vocab with {len(vocab)} terms.")
 
     logger.info("Downloading DTM file...")
-    S3Operations.download(settings.dtm, "dtm.pkl")
+    S3Operations.download(settings.dtm, settings.DTM_DOWNLOAD_PATH)
 
     logger.info("Loading dtm.pkl from disk...")
-    with open("dtm.pkl", "rb") as f:
+    with open(settings.DTM_DOWNLOAD_PATH, "rb") as f:
         dtm = pickle.load(f)
 
     logger.info(f"Loaded DTM with shape {dtm.shape}")
