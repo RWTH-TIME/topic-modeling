@@ -1,18 +1,22 @@
 import logging
-import pickle
+import pandas as pd
+
+from scystream.sdk.config import get_compute_block
+from scystream.sdk.config.config_loader import generate_config_from_compute_block
+from pathlib import Path
 
 from scystream.sdk.core import entrypoint
 from scystream.sdk.env.settings import (
     EnvSettings,
     InputSettings,
     OutputSettings,
-    FileSettings,
     PostgresSettings,
 )
-from scystream.sdk.file_handling.s3_manager import S3Operations
 from sqlalchemy import create_engine
 
 from algorithms.lda import LDAModeler
+from algorithms.models import PreprocessedDocument
+from algorithms.vectorizer import NLPVectorizer
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,16 +25,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class DTMFileInput(FileSettings, InputSettings):
-    __identifier__ = "dtm"
-
-    FILE_EXT: str = "pkl"
-
-
-class VocabFileInput(FileSettings, InputSettings):
-    __identifier__ = "vocab"
-
-    FILE_EXT: str = "pkl"
+class PreprocessedDocuments(PostgresSettings, InputSettings):
+    __identifier__ = "preprocessed_docs"
 
 
 class DocTopicOutput(PostgresSettings, OutputSettings):
@@ -47,50 +43,52 @@ class LDATopicModeling(EnvSettings):
     LEARNING_METHOD: str = "batch"
     N_TOP_WORDS: int = 10
 
-    DTM_DOWNLOAD_PATH: str = "/tmp/dtm.pkl"
-    VOCAB_DOWNLOAD_PATH: str = "/tmp/vocab.pkl"
-
-    vocab: VocabFileInput
-    dtm: DTMFileInput
+    preprocessed_docs: PreprocessedDocuments
 
     doc_topic: DocTopicOutput
     topic_term: TopicTermsOutput
 
 
-def write_df_to_postgres(df, settings: PostgresSettings):
-    logger.info(f"Writing DataFrame to DB table '{settings.DB_TABLE}'…")
-
-    engine = create_engine(
+def _make_engine(settings: PostgresSettings):
+    return create_engine(
         f"postgresql+psycopg2://{settings.PG_USER}:{settings.PG_PASS}"
         f"@{settings.PG_HOST}:{int(settings.PG_PORT)}/"
     )
+
+
+def write_df_to_postgres(df, settings: PostgresSettings):
+    logger.info(f"Writing DataFrame to DB table '{settings.DB_TABLE}'…")
+    engine = _make_engine(settings)
     df.to_sql(settings.DB_TABLE, engine, if_exists="replace", index=False)
     logger.info(f"Successfully wrote {len(df)} rows to '{settings.DB_TABLE}'.")
+
+
+def read_table_from_postgres(settings: PostgresSettings) -> pd.DataFrame:
+    engine = _make_engine(settings)
+    query = f"SELECT * FROM {settings.DB_TABLE};"
+    return pd.read_sql(query, engine)
 
 
 @entrypoint(LDATopicModeling)
 def lda_topic_modeling(settings):
     logger.info("Starting LDA topic modeling pipeline…")
 
-    logger.info("Downloading vocabulary file...")
-    S3Operations.download(settings.vocab, settings.VOCAB_DOWNLOAD_PATH)
+    logger.info("Querying normalized docs from db...")
+    normalized_docs = read_table_from_postgres(settings.preprocessed_docs)
 
-    logger.info("Loading vocab.pkl from disk...")
-    with open(settings.VOCAB_DOWNLOAD_PATH, "rb") as f:
-        vocab = pickle.load(f)
+    preprocessed_docs = [
+        PreprocessedDocument(
+            doc_id=row["doc_id"],
+            tokens=row["tokens"]
+        )
+        for _, row in normalized_docs.iterrows()
+    ]
 
-    logger.info(f"Loaded vocab with {len(vocab)} terms.")
+    vectorizer = NLPVectorizer(preprocessed_docs)
+    vectorizer.analyze_frequencies()
+    vocab = vectorizer.build_vocabulary()
+    dtm = vectorizer.build_dtm()
 
-    logger.info("Downloading DTM file...")
-    S3Operations.download(settings.dtm, settings.DTM_DOWNLOAD_PATH)
-
-    logger.info("Loading dtm.pkl from disk...")
-    with open(settings.DTM_DOWNLOAD_PATH, "rb") as f:
-        dtm = pickle.load(f)
-
-    logger.info(f"Loaded DTM with shape {dtm.shape}")
-
-    # TODO: Check if dtm and vocab is of correct schema
     lda = LDAModeler(
         dtm=dtm,
         vocab=vocab,
@@ -110,42 +108,6 @@ def lda_topic_modeling(settings):
     write_df_to_postgres(topic_terms, settings.topic_term)
 
 
-"""
 if __name__ == "__main__":
-    test = LDATopicModeling(
-        vocab=VocabFileInput(
-            S3_HOST="http://localhost",
-            S3_PORT="9000",
-            S3_ACCESS_KEY="minioadmin",
-            S3_SECRET_KEY="minioadmin",
-            BUCKET_NAME="output-bucket",
-            FILE_PATH="output_file_path",
-            FILE_NAME="vocab_file_bib",
-        ),
-        dtm=DTMFileInput(
-            S3_HOST="http://localhost",
-            S3_PORT="9000",
-            S3_ACCESS_KEY="minioadmin",
-            S3_SECRET_KEY="minioadmin",
-            BUCKET_NAME="output-bucket",
-            FILE_PATH="output_file_path",
-            FILE_NAME="dtm_file_bib",
-        ),
-        doc_topic=DocTopicOutput(
-            PG_USER="postgres",
-            PG_PASS="postgres",
-            PG_HOST="localhost",
-            PG_PORT="5432",
-            DB_TABLE="doc_topic"
-        ),
-        topic_term=TopicTermsOutput(
-            PG_USER="postgres",
-            PG_PASS="postgres",
-            PG_HOST="localhost",
-            PG_PORT="5432",
-            DB_TABLE="topic_term"
-        )
-    )
-
-    lda_topic_modeling(test)
-"""
+    cb = get_compute_block()
+    generate_config_from_compute_block(cb, Path("cbc2.yaml"))
