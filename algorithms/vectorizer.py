@@ -8,6 +8,7 @@ from algorithms.models import PreprocessedDocument
 class NLPVectorizer:
     def __init__(self, preprocessed_output: List[PreprocessedDocument]):
         self.documents = preprocessed_output
+        self.doc_ids = [doc.doc_id for doc in preprocessed_output]
 
         # Frequencies
         self.token_frequency = Counter()

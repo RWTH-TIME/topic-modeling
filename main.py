@@ -1,10 +1,6 @@
 import logging
 import pandas as pd
 
-from scystream.sdk.config import get_compute_block
-from scystream.sdk.config.config_loader import generate_config_from_compute_block
-from pathlib import Path
-
 from scystream.sdk.core import entrypoint
 from scystream.sdk.env.settings import (
     EnvSettings,
@@ -65,7 +61,7 @@ def write_df_to_postgres(df, settings: PostgresSettings):
 
 def read_table_from_postgres(settings: PostgresSettings) -> pd.DataFrame:
     engine = _make_engine(settings)
-    query = f"SELECT * FROM {settings.DB_TABLE};"
+    query = f"SELECT * FROM {settings.DB_TABLE} ORDER BY doc_id;"
     return pd.read_sql(query, engine)
 
 
@@ -92,6 +88,7 @@ def lda_topic_modeling(settings):
     lda = LDAModeler(
         dtm=dtm,
         vocab=vocab,
+        doc_ids=vectorizer.doc_ids,
         n_topics=settings.N_TOPICS,
         max_iter=settings.MAX_ITER,
         learning_method=settings.LEARNING_METHOD,
@@ -106,8 +103,3 @@ def lda_topic_modeling(settings):
     # TODO: Use Spark Integration here
     write_df_to_postgres(doc_topics, settings.doc_topic)
     write_df_to_postgres(topic_terms, settings.topic_term)
-
-
-if __name__ == "__main__":
-    cb = get_compute_block()
-    generate_config_from_compute_block(cb, Path("cbc2.yaml"))

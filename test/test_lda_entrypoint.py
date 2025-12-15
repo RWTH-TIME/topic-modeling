@@ -116,7 +116,8 @@ def test_lda_entrypoint(s3_minio, postgres_conn):
     doc_topics = pd.DataFrame(cur.fetchall(), columns=[
                               desc[0] for desc in cur.description])
     assert len(doc_topics) == 2
-    assert doc_topics.shape[1] == N_TOPICS
+    # expect N_TOPICS + 1 for doc_id
+    assert doc_topics.shape[1] == N_TOPICS + 1
 
     # 2. topic-term listing
     cur.execute(

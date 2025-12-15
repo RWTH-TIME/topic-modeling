@@ -22,25 +22,40 @@ def small_dtm():
 
 
 def test_lda_fit(small_dtm, small_vocab):
-    lda = LDAModeler(dtm=small_dtm, vocab=small_vocab, n_topics=2)
+    lda = LDAModeler(
+        dtm=small_dtm,
+        vocab=small_vocab,
+        doc_ids=["0", "1", "2"],
+        n_topics=2,
+    )
     lda.fit()
 
     assert lda.lda.components_.shape == (2, 4)
 
 
 def test_extract_doc_topics(small_dtm, small_vocab):
-    lda = LDAModeler(dtm=small_dtm, vocab=small_vocab, n_topics=2)
+    lda = LDAModeler(
+        dtm=small_dtm,
+        vocab=small_vocab,
+        doc_ids=["0", "1", "2"],
+        n_topics=2,
+    )
     lda.fit()
     df = lda.extract_doc_topics()
 
     assert isinstance(df, pd.DataFrame)
-    assert df.shape == (3, 2)
-    assert list(df.columns) == ["topic_0", "topic_1"]
+    assert df.shape == (3, 3)
+    assert list(df.columns) == ["doc_id", "topic_0", "topic_1"]
 
 
 def test_extract_topic_terms(small_dtm, small_vocab):
-    lda = LDAModeler(dtm=small_dtm, vocab=small_vocab,
-                     n_topics=2, n_top_words=2)
+    lda = LDAModeler(
+        dtm=small_dtm,
+        vocab=small_vocab,
+        doc_ids=["1", "2", "3"],
+        n_topics=2,
+        n_top_words=2
+    )
     lda.fit()
     df = lda.extract_topic_terms()
 
