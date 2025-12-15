@@ -1,12 +1,10 @@
 import os
-import boto3
 import pytest
 import psycopg2
 import time
 import pandas as pd
 
 from pathlib import Path
-from botocore.exceptions import ClientError
 from main import lda_topic_modeling
 
 MINIO_USER = "minioadmin"
@@ -17,35 +15,6 @@ POSTGRES_USER = "postgres"
 POSTGRES_PWD = "postgres"
 
 N_TOPICS = 5
-
-
-def ensure_bucket(s3, bucket):
-    try:
-        s3.head_bucket(Bucket=bucket)
-    except ClientError as e:
-        error_code = e.response["Error"]["Code"]
-        if error_code in ("404", "NoSuchBucket"):
-            s3.create_bucket(Bucket=bucket)
-        else:
-            raise
-
-
-def download_to_tmp(s3, bucket, key):
-    tmp_path = Path("/tmp") / key.replace("/", "_")
-    s3.download_file(bucket, key, str(tmp_path))
-    return tmp_path
-
-
-@pytest.fixture
-def s3_minio():
-    client = boto3.client(
-        "s3",
-        endpoint_url="http://localhost:9000",
-        aws_access_key_id=MINIO_USER,
-        aws_secret_access_key=MINIO_PWD
-    )
-    ensure_bucket(client, BUCKET_NAME)
-    return client
 
 
 @pytest.fixture(scope="session")
@@ -69,7 +38,7 @@ def postgres_conn():
     raise RuntimeError("Postgres did not start")
 
 
-def test_lda_entrypoint(s3_minio, postgres_conn):
+def test_lda_entrypoint(postgres_conn):
     doc_topic_table_name = "doc_topic"
     topic_terms_table_name = "topic_terms"
 
