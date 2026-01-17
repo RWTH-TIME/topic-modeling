@@ -13,6 +13,7 @@ class LDAModeler:
         self,
         dtm: np.ndarray = None,
         vocab: dict = None,
+        doc_ids: list[str] = [],
         n_topics: int = 10,
         max_iter: int = 10,
         learning_method: str = "batch",
@@ -21,6 +22,12 @@ class LDAModeler:
     ):
         self.dtm: np.ndarray = dtm
         self.vocab: dict = vocab
+        self.doc_ids = doc_ids
+
+        if len(self.doc_ids) != self.dtm.shape[0]:
+            raise ValueError(
+                "doc_ids length must match number of DTM rows"
+            )
 
         self.n_topics = n_topics
         self.max_iter = max_iter
@@ -58,6 +65,7 @@ class LDAModeler:
             self.doc_topic_dist,
             columns=[f"topic_{i}" for i in range(self.n_topics)],
         )
+        df.insert(0, "doc_id", self.doc_ids)
 
         logger.debug(
             f"Extracted doc-topic distribution DataFrame shape={df.shape}")
@@ -68,17 +76,28 @@ class LDAModeler:
         Generate topic and top-terms DataFrame
         """
         logger.info("Extracting top terms per topic...")
-        idx2term = {idx: term for term, idx in self.vocab.items()}
+
+        # NOTE:
+        # The order of `terms` is guaranteed to match the DTM column order.
+        # This is because the vocabulary is built in NLPVectorizer using:
+        #   sorted_terms = sorted(all_terms)
+        #   vocab = {term: i for i, term in enumerate(sorted_terms)}
+        # The same vocab indices are then used to construct the DTM columns.
+        # Since Python dicts preserve insertion order (>=3.7),
+        # list(self.vocab.keys())[i] correctly maps to DTM column i,
+        # and thus to lda.components_[topic_idx][i].
+        terms = list(self.vocab.keys())
         topic_rows = []
 
         for topic_idx, topic in enumerate(self.lda.components_):
-            sorted = np.argsort(topic)[::-1]
-            top_indices = sorted[:self.n_top_words]
+            sorted_idx = np.argsort(topic)[::-1]
+            top_indices = sorted_idx[: self.n_top_words]
+
             for i in top_indices:
                 topic_rows.append({
                     "topic_id": topic_idx,
-                    "term": idx2term[i],
-                    "weight": topic[i]
+                    "term": terms[int(i)],
+                    "weight": topic[i],
                 })
 
         df = pd.DataFrame(topic_rows)

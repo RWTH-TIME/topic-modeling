@@ -1,41 +1,24 @@
 author: Paul Kalhorn
-description: Compute Block that offers Topic Modeling Algorihtms
+description: Compute Block that offers topic modeling algorithms
 docker_image: ghcr.io/rwth-time/topic-modeling/topic-modeling
 entrypoints:
   lda_topic_modeling:
-    description: Sklearn LDA Topic Modeling 
+    description: Sklearn LDA Topic Modeling
     envs:
       LEARNING_METHOD: batch
       MAX_ITER: 10
       N_TOPICS: 5
       N_TOP_WORDS: 10
-      DTM_DOWNLOAD_PATH: /tmp/dtm.pkl
-      VOCAB_DOWNLOAD_PATH: /tmp/vocab.pkl
     inputs:
-      dtm:
+      preprocessed_docs:
         config:
-          dtm_BUCKET_NAME: null
-          dtm_FILE_EXT: pkl
-          dtm_FILE_NAME: null
-          dtm_FILE_PATH: null
-          dtm_S3_ACCESS_KEY: null
-          dtm_S3_HOST: null
-          dtm_S3_PORT: null
-          dtm_S3_SECRET_KEY: null
-        description: Pkl file of your numpy representation of the document-term matrix
-        type: file
-      vocab:
-        config:
-          vocab_BUCKET_NAME: null
-          vocab_FILE_EXT: pkl
-          vocab_FILE_NAME: null
-          vocab_FILE_PATH: null
-          vocab_S3_ACCESS_KEY: null
-          vocab_S3_HOST: null
-          vocab_S3_PORT: null
-          vocab_S3_SECRET_KEY: null
-        description: Pkl file of a dictionary that maps all words to their index in the DTM
-        type: file
+          preprocessed_docs_DB_TABLE: null
+          preprocessed_docs_PG_HOST: null
+          preprocessed_docs_PG_PASS: null
+          preprocessed_docs_PG_PORT: null
+          preprocessed_docs_PG_USER: null
+        description: A database table, expected to have the doc_id, and tokens (list of strings) 
+        type: pg_table
     outputs:
       doc_topic:
         config:
