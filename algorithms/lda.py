@@ -3,8 +3,6 @@ import logging
 import numpy as np
 import pandas as pd
 
-from typing import List
-
 from sklearn.decomposition import LatentDirichletAllocation
 
 logger = logging.getLogger(__name__)
@@ -15,7 +13,7 @@ class LDAModeler:
         self,
         dtm: np.ndarray = None,
         vocab: dict = None,
-        doc_ids: List[str] = [],
+        doc_ids: list[str] = [],
         n_topics: int = 10,
         max_iter: int = 10,
         learning_method: str = "batch",
