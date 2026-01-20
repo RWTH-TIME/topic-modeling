@@ -14,6 +14,8 @@ from algorithms.lda import LDAModeler
 from algorithms.models import PreprocessedDocument
 from algorithms.vectorizer import NLPVectorizer
 
+from algorithms.explanations import TopicExplainer
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -43,6 +45,33 @@ class LDATopicModeling(EnvSettings):
 
     doc_topic: DocTopicOutput
     topic_term: TopicTermsOutput
+
+
+class TopicTermsInput(PostgresSettings, InputSettings):
+    __identifier__ = "topic_terms_input"
+
+
+class QueryInformationInput(PostgresSettings, InputSettings):
+    """
+    Our TopicExplaination needs some kind of information about the actual
+    query executed,this query information includes the query and the source
+
+    Looking like: query, source
+    """
+    __identifier__ = "query_information_input"
+
+
+class ExplanationsOutput(PostgresSettings, OutputSettings):
+    __identifier__ = "ExplanationsOutput"
+
+
+class TopicExplanation(EnvSettings):
+    MODEL_NAME: str = "llama3.1"
+
+    topic_terms: TopicTermsInput
+    query_information: QueryInformationInput
+
+    explanations_output: ExplanationsOutput
 
 
 def _make_engine(settings: PostgresSettings):
@@ -103,3 +132,31 @@ def lda_topic_modeling(settings):
     # TODO: Use Spark Integration here
     write_df_to_postgres(doc_topics, settings.doc_topic)
     write_df_to_postgres(topic_terms, settings.topic_term)
+
+
+@entrypoint(TopicExplanation)
+def topic_explaination(settings):
+    logger.info("Starting topic explaination...")
+
+    logging.info("Querying topic terms from db...")
+    topic_terms = read_table_from_postgres(settings.topic_terms)
+
+    logging.info("Querying query information from db...")
+    query_information = read_table_from_postgres(settings.query_information)
+
+    metadata = query_information.iloc[0]
+
+    explainer = TopicExplainer(
+        model_name=settings.MODEL_NAME,
+    )
+
+    explainations = explainer.explain_topics(
+        topic_terms=topic_terms,
+        search_query=metadata["query"],
+        source=metadata["source"],
+        created_at=metadata["created_at"]
+    )
+
+    write_df_to_postgres(explainations, settings.explanations_output)
+
+    logging.info("Topic explanation block finished.")
