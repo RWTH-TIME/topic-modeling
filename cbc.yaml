@@ -1,9 +1,9 @@
-author: Paul Kalhorn
+author: Paul Kalhorn 
 description: Compute Block that offers topic modeling algorithms
 docker_image: ghcr.io/rwth-time/topic-modeling/topic-modeling
 entrypoints:
   lda_topic_modeling:
-    description: Sklearn LDA Topic Modeling
+    description: Sklearn LDA Topic Modeling 
     envs:
       LEARNING_METHOD: batch
       MAX_ITER: 10
@@ -37,5 +37,39 @@ entrypoints:
           top_terms_per_topic_PG_PORT: null
           top_terms_per_topic_PG_USER: null
         description: A table that lists most likely terms for a topic
+        type: pg_table
+  topic_explaination:
+    description: <tbd>
+    envs:
+      MODEL_NAME: gpt-oss:120b
+      OLLAMA_API_KEY: ''
+    inputs:
+      query_information:
+        config:
+          query_information_input_DB_TABLE: null
+          query_information_input_PG_HOST: null
+          query_information_input_PG_PASS: null
+          query_information_input_PG_PORT: null
+          query_information_input_PG_USER: null
+        description: Information of the query used, must contain query, source, created_at 
+        type: pg_table
+      topic_terms:
+        config:
+          topic_terms_input_DB_TABLE: null
+          topic_terms_input_PG_HOST: null
+          topic_terms_input_PG_PASS: null
+          topic_terms_input_PG_PORT: null
+          topic_terms_input_PG_USER: null
+        description: A table that lists most likely terms for a topic
+        type: pg_table
+    outputs:
+      explanations_output:
+        config:
+          explanations_output_DB_TABLE: null
+          explanations_output_PG_HOST: null
+          explanations_output_PG_PASS: null
+          explanations_output_PG_PORT: null
+          explanations_output_PG_USER: null
+        description: Output of the generated explanations, contains topic_id and description
         type: pg_table
 name: Topic-Modeling
