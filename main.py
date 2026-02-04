@@ -65,6 +65,12 @@ def read_table_from_postgres(settings: PostgresSettings) -> pd.DataFrame:
     return pd.read_sql(query, engine)
 
 
+def parse_pg_array(val):
+    if isinstance(val, str):
+        return val.strip("{}").split(",")
+    return val
+
+
 @entrypoint(LDATopicModeling)
 def lda_topic_modeling(settings):
     logger.info("Starting LDA topic modeling pipeline…")
@@ -75,7 +81,7 @@ def lda_topic_modeling(settings):
     preprocessed_docs = [
         PreprocessedDocument(
             doc_id=row["doc_id"],
-            tokens=row["tokens"]
+            tokens=parse_pg_array(row["tokens"])
         )
         for _, row in normalized_docs.iterrows()
     ]
