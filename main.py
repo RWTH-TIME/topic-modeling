@@ -8,7 +8,7 @@ from scystream.sdk.env.settings import (
     OutputSettings,
     PostgresSettings,
 )
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 from algorithms.lda import LDAModeler
 from algorithms.models import PreprocessedDocument
@@ -91,8 +91,14 @@ def write_df_to_postgres(df, settings: PostgresSettings):
 
 def read_table_from_postgres(settings: PostgresSettings) -> pd.DataFrame:
     engine = _make_engine(settings)
-    query = f"SELECT * FROM {settings.DB_TABLE};"
+    query = text(f'SELECT * FROM "{settings.DB_TABLE}";')
     return pd.read_sql(query, engine)
+
+
+def parse_pg_array(val):
+    if isinstance(val, str):
+        return val.strip("{}").split(",")
+    return val
 
 
 @entrypoint(LDATopicModeling)
@@ -105,7 +111,7 @@ def lda_topic_modeling(settings):
     preprocessed_docs = [
         PreprocessedDocument(
             doc_id=row["doc_id"],
-            tokens=row["tokens"]
+            tokens=parse_pg_array(row["tokens"])
         )
         for _, row in normalized_docs.iterrows()
     ]
