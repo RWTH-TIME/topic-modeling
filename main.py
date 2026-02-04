@@ -8,7 +8,7 @@ from scystream.sdk.env.settings import (
     OutputSettings,
     PostgresSettings,
 )
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 from algorithms.lda import LDAModeler
 from algorithms.models import PreprocessedDocument
@@ -61,7 +61,7 @@ def write_df_to_postgres(df, settings: PostgresSettings):
 
 def read_table_from_postgres(settings: PostgresSettings) -> pd.DataFrame:
     engine = _make_engine(settings)
-    query = f"SELECT * FROM {settings.DB_TABLE} ORDER BY doc_id;"
+    query = text(f'SELECT * FROM "{settings.DB_TABLE}" ORDER BY doc_id;')
     return pd.read_sql(query, engine)
 
 
