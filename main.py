@@ -62,11 +62,12 @@ class QueryInformationInput(PostgresSettings, InputSettings):
 
 
 class ExplanationsOutput(PostgresSettings, OutputSettings):
-    __identifier__ = "ExplanationsOutput"
+    __identifier__ = "explanations_output"
 
 
 class TopicExplanation(EnvSettings):
-    MODEL_NAME: str = "llama3.1"
+    MODEL_NAME: str = "gpt-oss:120b"
+    OLLAMA_API_KEY: str = ""
 
     topic_terms: TopicTermsInput
     query_information: QueryInformationInput
@@ -90,7 +91,7 @@ def write_df_to_postgres(df, settings: PostgresSettings):
 
 def read_table_from_postgres(settings: PostgresSettings) -> pd.DataFrame:
     engine = _make_engine(settings)
-    query = f"SELECT * FROM {settings.DB_TABLE} ORDER BY doc_id;"
+    query = f"SELECT * FROM {settings.DB_TABLE};"
     return pd.read_sql(query, engine)
 
 
@@ -148,6 +149,7 @@ def topic_explaination(settings):
 
     explainer = TopicExplainer(
         model_name=settings.MODEL_NAME,
+        api_key=settings.OLLAMA_API_KEY
     )
 
     explainations = explainer.explain_topics(

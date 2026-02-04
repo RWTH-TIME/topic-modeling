@@ -1,6 +1,6 @@
 import logging
-import requests
 import pandas as pd
+from ollama import Client
 
 logger = logging.getLogger(__name__)
 
@@ -8,51 +8,60 @@ logger = logging.getLogger(__name__)
 class TopicExplainer:
     def __init__(
         self,
-        model_name: str = "llama3.1",
-        ollama_url: str = "http://localhost:1234",
-        timeout: str = 60
+        api_key: str,
+        model_name: str = "gpt-oss:120b",
+        timeout: int = 60,
     ):
         self.model_name = model_name
-        self.ollama_url = ollama_url
         self.timeout = timeout
+
+        self.client = Client(
+            host="https://ollama.com",
+            headers={
+                "Authorization": "Bearer " + api_key
+            },
+            timeout=self.timeout,
+        )
 
     def explain_topics(
         self,
         topic_terms: pd.DataFrame,
         search_query: str,
         source: str,
-        created_at: str
-    ):
-        logger.info("Generating topic explainations...")
+        created_at: str,
+    ) -> pd.DataFrame:
+        logger.info("Generating topic explanations...")
 
         rows = []
 
         for topic_id, group in topic_terms.groupby("topic_id"):
             terms = (
-                group
-                .sort_values("weight", ascending=False)
+                group.sort_values("weight", ascending=False)["term"]
+                .astype(str)
                 .tolist()
             )
 
-            prompt = self._build_promt(
+            prompt = self._build_prompt(
                 topic_id=topic_id,
                 terms=terms,
                 search_query=search_query,
                 source=source,
-                created_at=created_at
+                created_at=created_at,
             )
 
             description = self._call_ollama(prompt)
 
-            rows.append({
-                "topic_id": topic_id,
-                "description": description
-            })
+            rows.append(
+                {
+                    "topic_id": topic_id,
+                    "description": description,
+                }
+            )
 
         df = pd.DataFrame(rows)
-        logger.info(
-            f"Generated explainations for {len(df)} topics"
-        )
+
+        logger.info(f"Generated explanations for {len(df)} topics")
+        return df
 
     def _build_prompt(
         self,
@@ -60,10 +69,9 @@ class TopicExplainer:
         terms: list[str],
         search_query: str,
         source: str,
-        created_at: str
-    ):
+        created_at: str,
+    ) -> str:
         terms_str = ", ".join(terms)
-
         date_info = f"Creation date: {created_at}"
 
         return f"""
@@ -71,7 +79,8 @@ class TopicExplainer:
         The documents come from {source}
 
         Search Query:
-        \"{search_query}\"{date_info}
+        "{search_query}"
+        {date_info}
 
         Topic ID: {topic_id}
 
@@ -79,23 +88,20 @@ class TopicExplainer:
         {terms_str}
 
         Task:
-        Describe in 1-2 concise sentences what this topic represents.
+        Describe in 1–2 concise sentences what this topic represents.
         Focus on the research subfield or thematic area.
         Do not list the keywords explicitly.
-        """
+        """.strip()
 
     def _call_ollama(self, prompt: str) -> str:
-        logger.debug("Calling Ollama...")
+        logger.debug("Calling Ollama Cloud...")
 
-        response = requests.post(
-            f"{self.ollama_url}/api/generate",
-            json={
-                "model": self.model_name,
-                "prompt": prompt,
-                "stream": False
-            },
-            timeout=self.timeout,
+        response = self.client.chat(
+            model=self.model_name,
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            stream=False,
         )
 
-        response.raise_for_status()
-        return response.json()["response"].strip()
+        return response["message"]["content"].strip()
