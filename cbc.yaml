@@ -38,8 +38,8 @@ entrypoints:
           top_terms_per_topic_PG_USER: null
         description: A table that lists most likely terms for a topic
         type: pg_table
-  topic_explaination:
-    description: <tbd>
+  topic_explanation:
+    description: Explains the topics using the query and top terms 
     envs:
       MODEL_NAME: gpt-oss:120b
       OLLAMA_API_KEY: ''

@@ -56,7 +56,7 @@ class QueryInformationInput(PostgresSettings, InputSettings):
     Our TopicExplaination needs some kind of information about the actual
     query executed,this query information includes the query and the source
 
-    Looking like: query, source
+    Looking like: query, source, created_at
     """
     __identifier__ = "query_information_input"
 
@@ -142,7 +142,7 @@ def lda_topic_modeling(settings):
 
 
 @entrypoint(TopicExplanation)
-def topic_explaination(settings):
+def topic_explanation(settings):
     logger.info("Starting topic explaination...")
 
     logging.info("Querying topic terms from db...")

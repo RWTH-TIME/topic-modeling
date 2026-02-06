@@ -6,7 +6,7 @@ import pandas as pd
 import re
 
 from pathlib import Path
-from main import topic_explaination
+from main import topic_explanation
 
 
 @pytest.fixture(scope="session")
@@ -113,7 +113,7 @@ def test_topic_explanation_with_real_ollama(postgres_conn):
     # Run entrypoint
     # ------------------------------------------------------------------
 
-    topic_explaination()
+    topic_explanation()
 
     # ------------------------------------------------------------------
     # Validate results
