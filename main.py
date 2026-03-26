@@ -1,4 +1,5 @@
 import logging
+import hashlib
 import pandas as pd
 
 from scystream.sdk.core import entrypoint
@@ -9,6 +10,7 @@ from scystream.sdk.env.settings import (
     PostgresSettings,
 )
 from sqlalchemy import create_engine, text
+from sqlalchemy.sql import quoted_name
 
 from algorithms.lda import LDAModeler
 from algorithms.models import PreprocessedDocument
@@ -21,6 +23,21 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def _normalize_table_name(table_name: str) -> str:
+    max_length = 63
+    if len(table_name) <= max_length:
+        return table_name
+    digest = hashlib.sha1(table_name.encode("utf-8")).hexdigest()[:10]
+    prefix_length = max_length - len(digest) - 1
+    return f"{table_name[:prefix_length]}_{digest}"
+
+
+def _resolve_db_table(settings: PostgresSettings) -> str:
+    normalized_name = _normalize_table_name(settings.DB_TABLE)
+    settings.DB_TABLE = normalized_name
+    return normalized_name
 
 
 class PreprocessedDocuments(PostgresSettings, InputSettings):
@@ -83,15 +100,22 @@ def _make_engine(settings: PostgresSettings):
 
 
 def write_df_to_postgres(df, settings: PostgresSettings):
-    logger.info(f"Writing DataFrame to DB table '{settings.DB_TABLE}'…")
+    resolved_table_name = _resolve_db_table(settings)
+    logger.info(f"Writing DataFrame to DB table '{resolved_table_name}'…")
     engine = _make_engine(settings)
-    df.to_sql(settings.DB_TABLE, engine, if_exists="replace", index=False)
-    logger.info(f"Successfully wrote {len(df)} rows to '{settings.DB_TABLE}'.")
+    table_name = quoted_name(resolved_table_name, quote=True)
+    df.to_sql(table_name, engine, if_exists="replace", index=False)
+    logger.info(
+        "Successfully wrote %s rows to '%s'.",
+        len(df),
+        resolved_table_name,
+    )
 
 
 def read_table_from_postgres(settings: PostgresSettings) -> pd.DataFrame:
+    resolved_table_name = _resolve_db_table(settings)
     engine = _make_engine(settings)
-    query = text(f'SELECT * FROM "{settings.DB_TABLE}";')
+    query = text(f'SELECT * FROM "{resolved_table_name}";')
     return pd.read_sql(query, engine)
 
 
