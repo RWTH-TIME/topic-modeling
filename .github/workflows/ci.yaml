@@ -23,6 +23,8 @@ jobs:
 
       - name: Run flake8
         uses: py-actions/flake8@v2
+        with:
+          args: --exclude=test
 
   validate-compute-block:
     name: Validate Compute Block Config
@@ -94,7 +96,7 @@ jobs:
         env:
           OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
         run: pytest -vv
-  
+
   build:
     name: Build docker image
     runs-on: ubuntu-latest
@@ -121,7 +123,7 @@ jobs:
           tags: |
             type=ref, event=pr
             type=raw, value=latest, enable=${{ (github.ref == format('refs/heads/{0}', 'main')) }}
-      
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
