@@ -14,11 +14,13 @@ def small_vocab():
 @pytest.fixture
 def small_dtm():
     # 2 documents, 4 terms
-    return np.array([
-        [0, 0, 2, 0],
-        [1, 1, 0, 3],
-        [0, 1, 1, 1],
-    ])
+    return np.array(
+        [
+            [0, 0, 2, 0],
+            [1, 1, 0, 3],
+            [0, 1, 1, 1],
+        ]
+    )
 
 
 def test_lda_fit(small_dtm, small_vocab):
@@ -54,7 +56,7 @@ def test_extract_topic_terms(small_dtm, small_vocab):
         vocab=small_vocab,
         doc_ids=["1", "2", "3"],
         n_topics=2,
-        n_top_words=2
+        n_top_words=2,
     )
     lda.fit()
     df = lda.extract_topic_terms()

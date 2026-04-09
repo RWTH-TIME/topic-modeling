@@ -19,7 +19,7 @@ def postgres_conn():
                 port=5432,
                 user="postgres",
                 password="postgres",
-                database="postgres"
+                database="postgres",
             )
             conn.autocommit = True
             yield conn
@@ -84,26 +84,14 @@ def test_topic_explanation_with_real_ollama(postgres_conn):
     # ------------------------------------------------------------------
 
     env = {
-        "topic_terms_input_PG_HOST": "127.0.0.1",
-        "topic_terms_input_PG_PORT": "5432",
-        "topic_terms_input_PG_USER": "postgres",
-        "topic_terms_input_PG_PASS": "postgres",
+        "topic_terms_input_DB_DSN": "postgresql://postgres:postgres@127.0.0.1:5432/postgres",
         "topic_terms_input_DB_TABLE": topic_terms_table,
-
-        "query_information_input_PG_HOST": "127.0.0.1",
-        "query_information_input_PG_PORT": "5432",
-        "query_information_input_PG_USER": "postgres",
-        "query_information_input_PG_PASS": "postgres",
+        "query_information_input_DB_DSN": "postgresql://postgres:postgres@127.0.0.1:5432/postgres",
         "query_information_input_DB_TABLE": query_information_table,
-
-        "explanations_output_PG_HOST": "127.0.0.1",
-        "explanations_output_PG_PORT": "5432",
-        "explanations_output_PG_USER": "postgres",
-        "explanations_output_PG_PASS": "postgres",
+        "explanations_output_DB_DSN": "postgresql://postgres:postgres@127.0.0.1:5432/postgres",
         "explanations_output_DB_TABLE": explanations_output_table,
-
         "MODEL_NAME": "gpt-oss:120b",
-        "API_KEY": os.environ.get("OLLAMA_API_KEY")
+        "API_KEY": os.environ.get("OLLAMA_API_KEY"),
     }
 
     for k, v in env.items():
@@ -120,10 +108,10 @@ def test_topic_explanation_with_real_ollama(postgres_conn):
     # ------------------------------------------------------------------
 
     cur.execute(
-        f"SELECT * FROM public.{explanations_output_table} ORDER BY topic_id;")
+        f"SELECT * FROM public.{explanations_output_table} ORDER BY topic_id;"
+    )
     results = pd.DataFrame(
-        cur.fetchall(),
-        columns=[desc[0] for desc in cur.description]
+        cur.fetchall(), columns=[desc[0] for desc in cur.description]
     )
 
     assert len(results) == 5
