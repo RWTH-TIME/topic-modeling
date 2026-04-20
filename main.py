@@ -89,7 +89,7 @@ def lda_topic_modeling(settings):
 
     logger.info("Querying normalized docs from db...")
     preprocessed_docs_db = PandasDatabaseOperations(
-        settings.preprocessed_docs.DB_DSN
+        settings.preprocessed_docs.DB_DSN, settings.preprocessed_docs.DB_SCHEMA
     )
     normalized_docs = preprocessed_docs_db.read(
         table=settings.preprocessed_docs.DB_TABLE
@@ -124,8 +124,12 @@ def lda_topic_modeling(settings):
 
     # TODO: Use Spark Integration here
     logging.info("Writing dataframes to db...")
-    doc_topic_db = PandasDatabaseOperations(settings.doc_topic.DB_DSN)
-    topic_terms_db = PandasDatabaseOperations(settings.topic_term.DB_DSN)
+    doc_topic_db = PandasDatabaseOperations(
+        settings.doc_topic.DB_DSN, settings.doc_topic.DB_SCHEMA
+    )
+    topic_terms_db = PandasDatabaseOperations(
+        settings.topic_term.DB_DSN, settings.topic_term.DB_SCHEMA
+    )
 
     doc_topic_db.write(
         table=settings.doc_topic.DB_TABLE, data=doc_topics, mode="overwrite"
@@ -140,17 +144,20 @@ def topic_explanation(settings):
     logger.info("Starting topic explaination...")
 
     logging.info("Querying topic terms from db...")
-    topic_terms_db = PandasDatabaseOperations(settings.topic_terms.DB_DSN)
+    topic_terms_db = PandasDatabaseOperations(
+        settings.topic_terms.DB_DSN, settings.topic_terms.DB_SCHEMA
+    )
     topic_terms = topic_terms_db.read(table=settings.topic_terms.DB_TABLE)
 
     logging.info("Querying query information from db...")
-    query_info_db = PandasDatabaseOperations(settings.query_information.DB_DSN)
+    query_info_db = PandasDatabaseOperations(
+        settings.query_information.DB_DSN, settings.query_information.DB_SCHEMA
+    )
     query_information = query_info_db.read(
         table=settings.query_information.DB_TABLE
     )
 
     metadata = query_information.iloc[0]
-    print(metadata)
 
     explainer = TopicExplainer(
         model_name=settings.MODEL_NAME, api_key=settings.OLLAMA_API_KEY
@@ -164,7 +171,8 @@ def topic_explanation(settings):
     )
 
     explainations_output_db = PandasDatabaseOperations(
-        settings.explanations_output.DB_DSN
+        settings.explanations_output.DB_DSN,
+        settings.explanations_output.DB_SCHEMA,
     )
     explainations_output_db.write(
         table=settings.explanations_output.DB_TABLE,
