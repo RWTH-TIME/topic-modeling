@@ -1,16 +1,15 @@
 import logging
-import hashlib
-import pandas as pd
 
 from scystream.sdk.core import entrypoint
+from scystream.sdk.database_handling.database_manager import (
+    PandasDatabaseOperations,
+)
 from scystream.sdk.env.settings import (
     EnvSettings,
     InputSettings,
     OutputSettings,
-    PostgresSettings,
+    DatabaseSettings,
 )
-from sqlalchemy import create_engine, text
-from sqlalchemy.sql import quoted_name
 
 from algorithms.lda import LDAModeler
 from algorithms.models import PreprocessedDocument
@@ -20,35 +19,20 @@ from algorithms.explanations import TopicExplainer
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
 
-def _normalize_table_name(table_name: str) -> str:
-    max_length = 63
-    if len(table_name) <= max_length:
-        return table_name
-    digest = hashlib.sha1(table_name.encode("utf-8")).hexdigest()[:10]
-    prefix_length = max_length - len(digest) - 1
-    return f"{table_name[:prefix_length]}_{digest}"
-
-
-def _resolve_db_table(settings: PostgresSettings) -> str:
-    normalized_name = _normalize_table_name(settings.DB_TABLE)
-    settings.DB_TABLE = normalized_name
-    return normalized_name
-
-
-class PreprocessedDocuments(PostgresSettings, InputSettings):
+class PreprocessedDocuments(DatabaseSettings, InputSettings):
     __identifier__ = "preprocessed_docs"
 
 
-class DocTopicOutput(PostgresSettings, OutputSettings):
+class DocTopicOutput(DatabaseSettings, OutputSettings):
     __identifier__ = "docs_to_topics"
 
 
-class TopicTermsOutput(PostgresSettings, OutputSettings):
+class TopicTermsOutput(DatabaseSettings, OutputSettings):
     __identifier__ = "top_terms_per_topic"
 
 
@@ -64,21 +48,22 @@ class LDATopicModeling(EnvSettings):
     topic_term: TopicTermsOutput
 
 
-class TopicTermsInput(PostgresSettings, InputSettings):
+class TopicTermsInput(DatabaseSettings, InputSettings):
     __identifier__ = "topic_terms_input"
 
 
-class QueryInformationInput(PostgresSettings, InputSettings):
+class QueryInformationInput(DatabaseSettings, InputSettings):
     """
     Our TopicExplaination needs some kind of information about the actual
     query executed,this query information includes the query and the source
 
     Looking like: query, source, created_at
     """
+
     __identifier__ = "query_information_input"
 
 
-class ExplanationsOutput(PostgresSettings, OutputSettings):
+class ExplanationsOutput(DatabaseSettings, OutputSettings):
     __identifier__ = "explanations_output"
 
 
@@ -92,33 +77,6 @@ class TopicExplanation(EnvSettings):
     explanations_output: ExplanationsOutput
 
 
-def _make_engine(settings: PostgresSettings):
-    return create_engine(
-        f"postgresql+psycopg2://{settings.PG_USER}:{settings.PG_PASS}"
-        f"@{settings.PG_HOST}:{int(settings.PG_PORT)}/"
-    )
-
-
-def write_df_to_postgres(df, settings: PostgresSettings):
-    resolved_table_name = _resolve_db_table(settings)
-    logger.info(f"Writing DataFrame to DB table '{resolved_table_name}'…")
-    engine = _make_engine(settings)
-    table_name = quoted_name(resolved_table_name, quote=True)
-    df.to_sql(table_name, engine, if_exists="replace", index=False)
-    logger.info(
-        "Successfully wrote %s rows to '%s'.",
-        len(df),
-        resolved_table_name,
-    )
-
-
-def read_table_from_postgres(settings: PostgresSettings) -> pd.DataFrame:
-    resolved_table_name = _resolve_db_table(settings)
-    engine = _make_engine(settings)
-    query = text(f'SELECT * FROM "{resolved_table_name}";')
-    return pd.read_sql(query, engine)
-
-
 def parse_pg_array(val):
     if isinstance(val, str):
         return val.strip("{}").split(",")
@@ -130,12 +88,16 @@ def lda_topic_modeling(settings):
     logger.info("Starting LDA topic modeling pipeline…")
 
     logger.info("Querying normalized docs from db...")
-    normalized_docs = read_table_from_postgres(settings.preprocessed_docs)
+    preprocessed_docs_db = PandasDatabaseOperations(
+        settings.preprocessed_docs.DB_DSN, settings.preprocessed_docs.DB_SCHEMA
+    )
+    normalized_docs = preprocessed_docs_db.read(
+        table=settings.preprocessed_docs.DB_TABLE
+    )
 
     preprocessed_docs = [
         PreprocessedDocument(
-            doc_id=row["doc_id"],
-            tokens=parse_pg_array(row["tokens"])
+            doc_id=row["doc_id"], tokens=parse_pg_array(row["tokens"])
         )
         for _, row in normalized_docs.iterrows()
     ]
@@ -153,7 +115,7 @@ def lda_topic_modeling(settings):
         max_iter=settings.MAX_ITER,
         learning_method=settings.LEARNING_METHOD,
         random_state=42,
-        n_top_words=settings.N_TOP_WORDS
+        n_top_words=settings.N_TOP_WORDS,
     )
     lda.fit()
 
@@ -161,8 +123,20 @@ def lda_topic_modeling(settings):
     topic_terms = lda.extract_topic_terms()
 
     # TODO: Use Spark Integration here
-    write_df_to_postgres(doc_topics, settings.doc_topic)
-    write_df_to_postgres(topic_terms, settings.topic_term)
+    logging.info("Writing dataframes to db...")
+    doc_topic_db = PandasDatabaseOperations(
+        settings.doc_topic.DB_DSN, settings.doc_topic.DB_SCHEMA
+    )
+    topic_terms_db = PandasDatabaseOperations(
+        settings.topic_term.DB_DSN, settings.topic_term.DB_SCHEMA
+    )
+
+    doc_topic_db.write(
+        table=settings.doc_topic.DB_TABLE, data=doc_topics, mode="overwrite"
+    )
+    topic_terms_db.write(
+        table=settings.topic_term.DB_TABLE, data=topic_terms, mode="overwrite"
+    )
 
 
 @entrypoint(TopicExplanation)
@@ -170,25 +144,40 @@ def topic_explanation(settings):
     logger.info("Starting topic explaination...")
 
     logging.info("Querying topic terms from db...")
-    topic_terms = read_table_from_postgres(settings.topic_terms)
+    topic_terms_db = PandasDatabaseOperations(
+        settings.topic_terms.DB_DSN, settings.topic_terms.DB_SCHEMA
+    )
+    topic_terms = topic_terms_db.read(table=settings.topic_terms.DB_TABLE)
 
     logging.info("Querying query information from db...")
-    query_information = read_table_from_postgres(settings.query_information)
+    query_info_db = PandasDatabaseOperations(
+        settings.query_information.DB_DSN, settings.query_information.DB_SCHEMA
+    )
+    query_information = query_info_db.read(
+        table=settings.query_information.DB_TABLE
+    )
 
     metadata = query_information.iloc[0]
 
     explainer = TopicExplainer(
-        model_name=settings.MODEL_NAME,
-        api_key=settings.OLLAMA_API_KEY
+        model_name=settings.MODEL_NAME, api_key=settings.OLLAMA_API_KEY
     )
 
-    explainations = explainer.explain_topics(
+    explanations = explainer.explain_topics(
         topic_terms=topic_terms,
         search_query=metadata["query"],
         source=metadata["source"],
-        created_at=metadata["created_at"]
+        created_at=metadata["created_at"],
     )
 
-    write_df_to_postgres(explainations, settings.explanations_output)
+    explainations_output_db = PandasDatabaseOperations(
+        settings.explanations_output.DB_DSN,
+        settings.explanations_output.DB_SCHEMA,
+    )
+    explainations_output_db.write(
+        table=settings.explanations_output.DB_TABLE,
+        data=explanations,
+        mode="overwrite",
+    )
 
     logging.info("Topic explanation block finished.")
